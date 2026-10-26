@@ -355,15 +355,18 @@ function fillRecent(transcriptions) {
 }
 
 function usageText(usage) {
+  const pack = Math.round(usage.extraPackMinutes ?? 0);
   if (usage.minutesPerMonth == null) return `${usage.plan} plan`;
+  // No monthly minutes (only a minute pack): don't show "0 of 0".
+  if (!usage.minutesPerMonth) {
+    return pack ? `${pack} pack minutes left` : 'No minutes left';
+  }
   const left = Math.max(
     0,
     Math.round(usage.minutesPerMonth - usage.minutesUsedThisMonth)
   );
-  const pack = usage.extraPackMinutes
-    ? ` + ${Math.round(usage.extraPackMinutes)} pack minutes`
-    : '';
-  return `${left} of ${usage.minutesPerMonth} minutes left this month${pack}`;
+  const monthly = `${left} of ${usage.minutesPerMonth} minutes left this month`;
+  return pack ? `${monthly} + ${pack} pack minutes` : monthly;
 }
 
 async function renderAccount() {

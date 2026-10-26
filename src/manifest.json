@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ScribeToAny: Transcribe Video & Audio",
   "short_name": "ScribeToAny",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Transcribe videos on X, Twitch, Loom, Google Drive and Dropbox into text and SRT/VTT subtitles with ScribeToAny.",
   "homepage_url": "https://scribetoany.com/developers",
   "icons": {
