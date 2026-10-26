@@ -13,6 +13,10 @@ import { BASE_URL, CLIENT_NAME, SCOPE, ext } from './config.js';
  */
 
 const AUTH_KEY = 'auth';
+/** Set while the sign-in window is open or the code is being exchanged. */
+export const SIGNING_IN_KEY = 'signingIn';
+/** Account, usage and recent transcripts the popup shows while it refreshes. */
+export const POPUP_CACHE_KEY = 'popupCache';
 /** Refresh this long before the access token expires. */
 const REFRESH_MARGIN_MS = 60 * 1000;
 
@@ -87,6 +91,15 @@ const withTokens = (auth, tokens) => ({
 
 /** Open the sign-in window and store the tokens. Runs in the background. */
 export async function signIn() {
+  await ext.storage.local.set({ [SIGNING_IN_KEY]: Date.now() });
+  try {
+    await runSignIn();
+  } finally {
+    await ext.storage.local.remove(SIGNING_IN_KEY);
+  }
+}
+
+async function runSignIn() {
   const redirectUri = ext.identity.getRedirectURL();
   const client = await ensureClient(await loadAuth(), redirectUri);
   await saveAuth({ clientId: client.clientId, redirectUri });
@@ -167,9 +180,11 @@ export async function getAccessToken({ forceRefresh = false } = {}) {
   }
 }
 
-/** Revoke the tokens on the server (best effort) and forget them. */
+/** Forget the tokens right away, then revoke them on the server (best effort). */
 export async function signOut() {
   const auth = await loadAuth();
+  // The revoke endpoint deletes this client too, so register a new one next time.
+  await ext.storage.local.remove([AUTH_KEY, POPUP_CACHE_KEY]);
   if (auth?.accessToken) {
     await fetch(new URL('/api/v1/auth/revoke', BASE_URL), {
       method: 'POST',
@@ -177,10 +192,15 @@ export async function signOut() {
       headers: { Authorization: `Bearer ${auth.accessToken}` },
     }).catch(() => {});
   }
-  // The revoke endpoint deletes this client too, so register a new one next time.
-  await ext.storage.local.remove(AUTH_KEY);
 }
 
 export async function isSignedIn() {
   return Boolean((await loadAuth())?.accessToken);
+}
+
+/** A sign-in started in the last 5 minutes and not finished yet. */
+export async function isSigningIn() {
+  const stored = await ext.storage.local.get(SIGNING_IN_KEY);
+  const startedAt = stored[SIGNING_IN_KEY];
+  return Boolean(startedAt && Date.now() - startedAt < 5 * 60 * 1000);
 }

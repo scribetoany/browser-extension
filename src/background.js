@@ -152,6 +152,13 @@ ext.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     switch (message?.type) {
       case 'signIn':
         await signIn();
+        // The popup closed when the sign-in window opened: bring it back.
+        // openPopup needs Chrome 127+ and a focused window; ignore failures.
+        try {
+          await ext.action.openPopup?.();
+        } catch {
+          // no focused window, or not supported
+        }
         return { ok: true };
       case 'signOut':
         await signOut();

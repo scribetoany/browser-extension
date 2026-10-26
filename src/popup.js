@@ -7,7 +7,12 @@ import {
   getUsage,
   listTranscriptions,
 } from './lib/api.js';
-import { isSignedIn } from './lib/auth.js';
+import {
+  POPUP_CACHE_KEY,
+  SIGNING_IN_KEY,
+  isSignedIn,
+  isSigningIn,
+} from './lib/auth.js';
 import { BASE_URL, ext, siteUrl } from './lib/config.js';
 import { isFinished, loadJobs, updateJob } from './lib/jobs.js';
 import { classifyLink } from './lib/links.js';
@@ -45,6 +50,8 @@ const STATUS_LABEL = {
 const app = document.getElementById('app');
 const errorBox = document.getElementById('error');
 const signOutButton = document.getElementById('sign-out');
+/** 'signed-in', 'signed-out' or 'signing-in'. */
+let mode = null;
 let pollTimer = null;
 /** Bumped on every full render, so late async work for an old view is dropped. */
 let view = 0;
@@ -83,8 +90,37 @@ async function ensureHostPermission() {
   return ext.permissions.request({ origins });
 }
 
+async function loadCache() {
+  const stored = await ext.storage.local.get(POPUP_CACHE_KEY);
+  return stored[POPUP_CACHE_KEY] ?? {};
+}
+
+async function saveCache(patch) {
+  // A late response after signing out must not bring the cache back.
+  if (mode !== 'signed-in') return;
+  const cache = await loadCache();
+  await ext.storage.local.set({ [POPUP_CACHE_KEY]: { ...cache, ...patch } });
+}
+
+function renderSigningIn() {
+  view += 1;
+  mode = 'signing-in';
+  clearInterval(pollTimer);
+  showError(null);
+  signOutButton.hidden = true;
+  app.replaceChildren(
+    el('section', { className: 'card' }, [
+      el('p', {}, [el('span', { className: 'spinner' }), 'Finishing sign-in…']),
+      el('p', { className: 'muted small' }, [
+        'Approve "Browser extension" in the sign-in window. This updates by itself.',
+      ]),
+    ])
+  );
+}
+
 function renderSignedOut() {
   view += 1;
+  mode = 'signed-out';
   clearInterval(pollTimer);
   showError(null);
   signOutButton.hidden = true;
@@ -97,14 +133,12 @@ function renderSignedOut() {
       showError('ScribeToAny needs access to scribetoany.com to sign in.');
       return;
     }
-    button.disabled = true;
-    button.textContent = 'Waiting for the sign-in window…';
+    renderSigningIn();
     const result = await send({ type: 'signIn' });
     if (result?.ok) {
-      renderSignedIn();
+      if (mode !== 'signed-in') renderSignedIn();
     } else {
-      button.disabled = false;
-      button.textContent = 'Sign in to ScribeToAny';
+      renderSignedOut();
       showError(result?.error);
     }
   });
@@ -296,9 +330,14 @@ async function renderActive() {
 }
 
 async function renderRecent() {
-  const list = document.getElementById('recent');
   const { transcriptions } = await listTranscriptions(5);
-  if (!list.isConnected) return;
+  await saveCache({ recent: transcriptions });
+  fillRecent(transcriptions);
+}
+
+function fillRecent(transcriptions) {
+  const list = document.getElementById('recent');
+  if (!list) return;
   if (!transcriptions.length) {
     list.replaceChildren(el('li', { className: 'muted small' }, ['None yet.']));
     return;
@@ -327,34 +366,64 @@ function usageText(usage) {
   return `${left} of ${usage.minutesPerMonth} minutes left this month${pack}`;
 }
 
+async function renderAccount() {
+  const [account, usage] = await Promise.all([getAccount(), getUsage()]);
+  const line = [account.email, usageText(usage)].filter(Boolean).join(' · ');
+  await saveCache({ accountLine: line });
+  const node = document.getElementById('account');
+  if (node) node.textContent = line;
+}
+
 async function renderSignedIn() {
   const current = ++view;
+  mode = 'signed-in';
   showError(null);
   signOutButton.hidden = false;
   app.replaceChildren(fromTemplate('signed-in'));
   document.getElementById('dashboard').href = siteUrl('/dashboard');
-  renderPage(document.getElementById('page'), await currentTab());
-  try {
-    const [account, usage] = await Promise.all([getAccount(), getUsage()]);
-    if (current !== view) return;
-    document.getElementById('account').textContent = [
-      account.email,
-      usageText(usage),
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    await Promise.all([renderActive(), renderRecent()]);
-  } catch (error) {
-    if (current === view) handleError(error);
+
+  // Last known values first, so the popup is useful before the API answers.
+  const cache = await loadCache();
+  if (current !== view) return;
+  if (cache.accountLine) {
+    document.getElementById('account').textContent = cache.accountLine;
   }
+  if (cache.recent) fillRecent(cache.recent);
+  renderPage(document.getElementById('page'), await currentTab());
+
+  const results = await Promise.allSettled([
+    renderAccount(),
+    renderActive(),
+    renderRecent(),
+  ]);
+  const failed = results.find((r) => r.status === 'rejected');
+  if (failed && current === view) handleError(failed.reason);
 }
 
-signOutButton.addEventListener('click', async () => {
-  await send({ type: 'signOut' });
+signOutButton.addEventListener('click', () => {
+  // Switch right away; the background forgets the tokens and revokes them.
   renderSignedOut();
+  send({ type: 'signOut' });
+});
+
+// Sign-in finishes in the background (often after this popup closed and was
+// reopened): switch views when the stored tokens or the sign-in flag change.
+ext.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local') return;
+  if (changes.auth?.newValue?.accessToken && mode !== 'signed-in') {
+    renderSignedIn();
+  } else if (
+    changes[SIGNING_IN_KEY] &&
+    !changes[SIGNING_IN_KEY].newValue &&
+    mode === 'signing-in' &&
+    !(await isSignedIn())
+  ) {
+    renderSignedOut();
+  }
 });
 
 (async () => {
   if (await isSignedIn()) await renderSignedIn();
+  else if (await isSigningIn()) renderSigningIn();
   else renderSignedOut();
 })();

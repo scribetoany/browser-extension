@@ -47,8 +47,9 @@
           local: {
             get: async (key) => ({ [key]: store[key] }),
             set: async (obj) => Object.assign(store, obj),
-            remove: async (key) => delete store[key],
+            remove: async (keys) => [keys].flat().forEach((k) => delete store[k]),
           },
+          onChanged: { addListener: () => {} },
         },
         runtime: {
           sendMessage: async () => ({ ok: true }),
