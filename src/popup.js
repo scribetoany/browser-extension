@@ -46,6 +46,8 @@ const app = document.getElementById('app');
 const errorBox = document.getElementById('error');
 const signOutButton = document.getElementById('sign-out');
 let pollTimer = null;
+/** Bumped on every full render, so late async work for an old view is dropped. */
+let view = 0;
 
 function el(tag, props = {}, children = []) {
   const node = document.createElement(tag);
@@ -82,7 +84,9 @@ async function ensureHostPermission() {
 }
 
 function renderSignedOut() {
+  view += 1;
   clearInterval(pollTimer);
+  showError(null);
   signOutButton.hidden = true;
   app.replaceChildren(fromTemplate('signed-out'));
   const button = document.getElementById('sign-in');
@@ -207,6 +211,7 @@ async function renderActive() {
   let current = job;
   try {
     current = { ...job, ...(await getTranscription(job.id)) };
+    if (!section.isConnected) return;
     if (current.status !== job.status) {
       await updateJob(job.id, {
         status: current.status,
@@ -293,6 +298,7 @@ async function renderActive() {
 async function renderRecent() {
   const list = document.getElementById('recent');
   const { transcriptions } = await listTranscriptions(5);
+  if (!list.isConnected) return;
   if (!transcriptions.length) {
     list.replaceChildren(el('li', { className: 'muted small' }, ['None yet.']));
     return;
@@ -322,6 +328,7 @@ function usageText(usage) {
 }
 
 async function renderSignedIn() {
+  const current = ++view;
   showError(null);
   signOutButton.hidden = false;
   app.replaceChildren(fromTemplate('signed-in'));
@@ -329,6 +336,7 @@ async function renderSignedIn() {
   renderPage(document.getElementById('page'), await currentTab());
   try {
     const [account, usage] = await Promise.all([getAccount(), getUsage()]);
+    if (current !== view) return;
     document.getElementById('account').textContent = [
       account.email,
       usageText(usage),
@@ -337,7 +345,7 @@ async function renderSignedIn() {
       .join(' · ');
     await Promise.all([renderActive(), renderRecent()]);
   } catch (error) {
-    handleError(error);
+    if (current === view) handleError(error);
   }
 }
 
