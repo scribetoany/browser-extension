@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Store screenshot</title>
+    <!-- 1280×800 store screenshot: /preview/store.html?state=done&shot=1 -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 1280px;
+        height: 800px;
+        overflow: hidden;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: #1c1b19;
+        color: #f2efe9;
+      }
+      .wrap {
+        display: flex;
+        align-items: center;
+        gap: 72px;
+        height: 100%;
+        padding: 0 96px;
+        box-sizing: border-box;
+        background:
+          radial-gradient(circle at 15% 20%, rgba(201, 100, 66, 0.25), transparent 45%),
+          radial-gradient(circle at 85% 90%, rgba(201, 100, 66, 0.15), transparent 40%);
+      }
+      .copy {
+        flex: 1;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 22px;
+        font-weight: 600;
+        margin-bottom: 28px;
+      }
+      h1 {
+        font-size: 52px;
+        line-height: 1.1;
+        margin: 0 0 20px;
+        letter-spacing: -0.02em;
+      }
+      p {
+        font-size: 22px;
+        line-height: 1.45;
+        color: #c9c3b9;
+        margin: 0 0 14px;
+      }
+      .accent {
+        color: #e0805f;
+      }
+      iframe {
+        width: 380px;
+        height: 560px;
+        zoom: 1.3;
+        border: 1px solid #3a3834;
+        border-radius: 14px;
+        background: #1c1b19;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="copy">
+        <div class="logo">
+          <img src="/src/icons/icon-48.png" width="36" height="36" alt="" />
+          ScribeToAny
+        </div>
+        <h1 id="title"></h1>
+        <p id="line1"></p>
+        <p id="line2"></p>
+      </div>
+      <iframe id="popup" title="Popup"></iframe>
+    </div>
+    <script>
+      const q = new URLSearchParams(location.search);
+      const shots = {
+        1: {
+          state: 'page',
+          title: 'Transcribe the video <span class="accent">you are watching</span>',
+          line1: 'X, Twitch, Loom, Google Drive and Dropbox videos into text in one click.',
+          line2: 'About 98 languages, detected automatically. Optional speaker labels.',
+        },
+        2: {
+          state: 'done',
+          title: 'Text and subtitles, <span class="accent">ready to use</span>',
+          line1: 'Copy the transcript, or download SRT and TXT with timestamps.',
+          line2: "You get a notification when it's done, even with the popup closed.",
+        },
+      };
+      const shot = shots[q.get('shot') || '1'];
+      document.getElementById('title').innerHTML = shot.title;
+      document.getElementById('line1').textContent = shot.line1;
+      document.getElementById('line2').textContent = shot.line2;
+      document.getElementById('popup').src = `/preview/?state=${shot.state}`;
+    </script>
+  </body>
+</html>

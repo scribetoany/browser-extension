@@ -1,0 +1,12 @@
+{
+  "name": "scribetoany-browser-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Transcribe videos on X, Twitch, Loom, Google Drive and Dropbox with ScribeToAny",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:local": "node scripts/build.mjs --base http://localhost:3000"
+  }
+}

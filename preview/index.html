@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Popup preview</title>
+    <base href="/src/" />
+    <link rel="stylesheet" href="popup.css" />
+    <!--
+      Renders src/popup.html outside the extension with a fake browser API and
+      fake /api/v1 responses, to check layouts and take store screenshots.
+      Serve the repo root (python3 -m http.server) and open /preview/?state=…
+      with state = signed-out | page | active | done | unsupported | youtube.
+    -->
+    <script>
+      window.__realFetch = window.fetch.bind(window);
+      const state = new URLSearchParams(location.search).get('state') || 'page';
+      const store = {};
+      if (state !== 'signed-out') {
+        store.auth = {
+          clientId: 'preview',
+          accessToken: 'preview',
+          refreshToken: 'preview',
+          expiresAt: Date.now() + 3600e3,
+        };
+      }
+      if (state === 'active' || state === 'done') {
+        store.jobs = [
+          {
+            id: 'job1',
+            status: state === 'done' ? 'done' : 'transcribing',
+            sourceUrl: 'https://x.com/example/status/1849371030472130908',
+          },
+        ];
+      }
+      const tabs = {
+        page: {
+          url: 'https://x.com/example/status/1849371030472130908',
+          title: 'Keynote: Building products with speech AI',
+        },
+        unsupported: { url: 'https://news.ycombinator.com/', title: 'Hacker News' },
+        youtube: { url: 'https://www.youtube.com/watch?v=abc', title: 'YouTube' },
+      };
+      const tab = tabs[state] ?? tabs.page;
+      const noop = () => {};
+      window.chrome = {
+        storage: {
+          local: {
+            get: async (key) => ({ [key]: store[key] }),
+            set: async (obj) => Object.assign(store, obj),
+            remove: async (key) => delete store[key],
+          },
+        },
+        runtime: {
+          sendMessage: async () => ({ ok: true }),
+          getURL: (p) => p,
+        },
+        tabs: { query: async () => [tab], create: noop },
+        permissions: { contains: async () => true, request: async () => true },
+      };
+      const job = {
+        id: 'job1',
+        name: 'Keynote: Building products with speech AI',
+        status: state === 'done' ? 'done' : 'transcribing',
+        error: null,
+        language: 'en',
+        durationSec: 754,
+        planLimit: null,
+        createdAt: new Date().toISOString(),
+        url: '#',
+      };
+      const recent = [
+        job,
+        { ...job, id: 'b', name: 'Weekly product sync.m4a', status: 'done' },
+        { ...job, id: 'c', name: 'loom.com/share/onboarding-walkthrough', status: 'done' },
+        { ...job, id: 'd', name: 'Interview with Maya (bakery).mp3', status: 'done' },
+        { ...job, id: 'e', name: 'Twitch VOD: Speedrun commentary', status: 'done' },
+      ];
+      const routes = {
+        '/api/v1/me': { email: 'r***@gmail.com', plan: 'plus' },
+        '/api/v1/usage': {
+          plan: 'plus',
+          minutesUsedThisMonth: 312,
+          minutesPerMonth: 1500,
+          extraPackMinutes: 0,
+        },
+        '/api/v1/transcriptions': {
+          total: 5,
+          transcriptions: state === 'active' || state === 'done' ? recent : recent.slice(1),
+        },
+        '/api/v1/transcriptions/job1': job,
+      };
+      window.fetch = async (input) => {
+        const path = new URL(input, location.origin).pathname;
+        const body = routes[path];
+        return new Response(JSON.stringify(body ?? {}), {
+          status: body ? 200 : 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      };
+      document.addEventListener('DOMContentLoaded', async () => {
+        const html = await (await window.__realFetch('popup.html')).text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        doc.querySelectorAll('script').forEach((s) => s.remove());
+        document.body.innerHTML = doc.body.innerHTML;
+        await import('/src/popup.js');
+      });
+    </script>
+  </head>
+  <body></body>
+</html>

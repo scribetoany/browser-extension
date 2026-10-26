@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>ScribeToAny</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img src="icons/icon-32.png" alt="" width="20" height="20" />
+      <span class="brand">ScribeToAny</span>
+      <span class="spacer"></span>
+      <button id="sign-out" class="link" hidden>Sign out</button>
+    </header>
+
+    <main id="app">
+      <p class="muted">Loading…</p>
+    </main>
+
+    <template id="signed-out">
+      <section class="card">
+        <h1>Transcribe videos in one click</h1>
+        <p class="muted">
+          Turn videos on X, Twitch, Loom, Google Drive and Dropbox into text
+          and SRT/VTT subtitles with timestamps, in about 98 languages.
+        </p>
+        <button id="sign-in" class="primary">Sign in to ScribeToAny</button>
+        <p class="fine">
+          New here? You can create a free account in the sign-in window: 100
+          minutes every month, no card.
+        </p>
+      </section>
+    </template>
+
+    <template id="signed-in">
+      <p id="account" class="muted small"></p>
+      <section id="page" class="card"></section>
+      <section id="active" class="card" hidden></section>
+      <section class="recent">
+        <h2>Recent transcripts</h2>
+        <ul id="recent"><li class="muted small">Loading…</li></ul>
+        <a id="dashboard" class="small" target="_blank">Open dashboard</a>
+      </section>
+    </template>
+
+    <p id="error" class="error" role="alert" hidden></p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>
